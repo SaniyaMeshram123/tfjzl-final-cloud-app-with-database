@@ -31,7 +31,9 @@ def registration_request(request):
         first_name = request.POST['firstname']
         last_name = request.POST['lastname']
 
-        user_exist = User.objects.filter(username=username).exists()
+        user_exist = User.objects.filter(
+            username=username
+        ).exists()
 
         if not user_exist:
             user = User.objects.create_user(
@@ -94,7 +96,7 @@ def logout_request(request):
     return redirect('onlinecourse:index')
 
 
-# Check whether the user is enrolled in a course
+# Check Whether User Is Enrolled
 def check_if_enrolled(user, course):
     if user.is_authenticated:
         return Enrollment.objects.filter(
@@ -135,7 +137,10 @@ class CourseDetailView(generic.DetailView):
 # Enroll in a Course
 @login_required
 def enroll(request, course_id):
-    course = get_object_or_404(Course, pk=course_id)
+    course = get_object_or_404(
+        Course,
+        pk=course_id
+    )
 
     is_enrolled = check_if_enrolled(
         request.user,
@@ -177,7 +182,7 @@ def submit(request, course_id):
         pk=course_id
     )
 
-    # Verify that the user is enrolled
+    # Verify user enrollment
     enrollment = get_object_or_404(
         Enrollment,
         user=request.user,
@@ -192,16 +197,16 @@ def submit(request, course_id):
     # Extract selected answers
     selected_ids = extract_answers(request)
 
-    # Get only valid choices belonging to this course
+    # Get valid choices belonging to this course
     valid_choices = Choice.objects.filter(
         id__in=selected_ids,
         question__course=course
     )
 
-    # Save selected choices in the submission
+    # Save selected choices
     submission.choices.set(valid_choices)
 
-    # Redirect to exam result page
+    # Redirect to exam result
     return HttpResponseRedirect(
         reverse(
             'onlinecourse:exam_result',
@@ -210,7 +215,7 @@ def submit(request, course_id):
     )
 
 
-# Extract Selected Answers from the Request
+# Extract Selected Answers
 def extract_answers(request):
     submitted_answers = []
 
@@ -235,7 +240,7 @@ def show_exam_result(request, course_id, submission_id):
         pk=course_id
     )
 
-    # Verify that the submission belongs to this user and course
+    # Verify submission belongs to the current user and course
     submission = get_object_or_404(
         Submission,
         id=submission_id,
@@ -243,14 +248,16 @@ def show_exam_result(request, course_id, submission_id):
         enrollment__user=request.user
     )
 
+    # Get selected choices
     selected_choices = submission.choices.all()
 
+    # Get all questions for this course
     questions = course.question_set.all()
 
     total_score = 0
     max_score = 0
 
-    # Calculate marks for every question
+    # Calculate score question by question
     for question in questions:
 
         max_score += question.grade
@@ -267,17 +274,19 @@ def show_exam_result(request, course_id, submission_id):
             ).values_list('id', flat=True)
         )
 
-        # Award marks only when all selected answers are correct
+        # Award marks only for the exact correct answer set
         if correct_ids == selected_ids:
             total_score += question.grade
 
     # Calculate percentage
     if max_score > 0:
-        score_percent = (total_score / max_score) * 100
+        score_percent = (
+            total_score / max_score
+        ) * 100
     else:
         score_percent = 0
 
-    # Prepare result context
+    # Prepare context for exam_result_bootstrap.html
     context = {
         'course': course,
         'grade': total_score,
@@ -286,6 +295,9 @@ def show_exam_result(request, course_id, submission_id):
         'is_passed': score_percent >= 80,
         'choices': selected_choices,
         'questions': questions,
+        'selected_choice_ids': list(
+            selected_choices.values_list('id', flat=True)
+        ),
     }
 
     return render(
@@ -293,22 +305,3 @@ def show_exam_result(request, course_id, submission_id):
         'onlinecourse/exam_result_bootstrap.html',
         context
     )
-
-            total_score += question.grade
-
-    max_score = sum(question.grade for question in questions)
-    score_percent = (total_score / max_score * 100) if max_score > 0 else 0
-    is_passed = score_percent >= 80
-
-    context['course'] = course
-    context['grade'] = total_score
-    context['max_score'] = max_score
-    context['score_percent'] = round(score_percent, 2)
-    context['is_passed'] = is_passed
-    context['choices'] = choices
-    context['questions'] = questions
-
-    return render(request, 'onlinecourse/exam_result_bootstrap.html', context)
-
-
-
